@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Micromouse Simulator - A* + PID</title>
+<style>
+  body { font-family: sans-serif; background: #1a1a1a; color: #eee; display: flex; flex-direction: column; align-items: center; padding: 24px; }
+  h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+  p.sub { color: #888; font-size: 13px; margin: 0 0 16px; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  button { background: #2a2a2a; color: #eee; border: 1px solid #444; border-radius: 6px; padding: 8px 14px; cursor: pointer; font-size: 14px; }
+  button:hover { background: #3a3a3a; }
+  .layout { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  canvas { border: 1px solid #444; border-radius: 6px; cursor: crosshair; background: #111; }
+  .sidebar { min-width: 220px; font-size: 13px; color: #bbb; }
+  .sidebar h3 { color: #eee; font-size: 14px; font-weight: 500; margin: 16px 0 6px; }
+  .sidebar h3:first-child { margin-top: 0; }
+  .row { display: flex; justify-content: space-between; padding: 2px 0; }
+  .row span:last-child { color: #eee; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .hint { font-size: 12px; color: #777; margin-top: 20px; line-height: 1.5; }
+  label { font-size: 13px; color: #bbb; display: flex; align-items: center; gap: 6px; }
+  input[type=range] { width: 100px; }
+  .gainbox { display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+  .gainbox label { flex-direction: column; align-items: flex-start; gap: 2px; font-size: 11px; }
+  .gainbox input[type=number] { width: 54px; background: #222; color: #eee; border: 1px solid #444; border-radius: 4px; padding: 3px 5px; }
+</style>
+</head>
+<body>
+
+<h1>Micromouse Simulator</h1>
+<p class="sub">A* search with Manhattan-distance heuristic, driven autonomously by a PID controller</p>
+
+<div class="controls">
+  <button id="btnMaze">New maze</button>
+  <button id="btnClear">Clear walls</button>
+  <button id="btnReset">Reset mouse</button>
+  <button id="btnRun">Start autonomous run</button>
+  <label>Max speed <input type="range" id="maxSpeed" min="40" max="260" value="150" step="10"></label>
+</div>
+
+<div class="layout">
+  <canvas id="grid" width="480" height="480"></canvas>
+  <div class="sidebar">
+    <h3>Telemetry</h3>
+    <div class="row"><span>Heading</span><span id="tHeading">0 deg</span></div>
+    <div class="row"><span>Speed</span><span id="tSpeed">0 px/s</span></div>
+    <div class="row"><span>Manhattan dist</span><span id="tManhattan">-</span></div>
+    <div class="row"><span>Path cells</span><span id="tPath">-</span></div>
+    <div class="row"><span>PID heading out</span><span id="tPidOut">0</span></div>
+    <div class="row"><span>Status</span><span id="tStatus">idle</span></div>
+
+    <h3>PID gains (heading)</h3>
+    <div class="gainbox">
+      <label>Kp <input type="number" id="kp" value="7" step="0.1"></label>
+      <label>Ki <input type="number" id="ki" value="0" step="0.05"></label>
+      <label>Kd <input type="number" id="kd" value="0.8" step="0.1"></label>
+    </div>
+
+    <div class="hint">Draw walls by clicking near a cell edge - even mid run. The mouse replans its A* path live and keeps driving from wherever it is.</div>
+  </div>
+</div>
+
+<script>
+const N = 12;
+const cell = 40;
+const canvas = document.getElementById('grid');
+const ctx = canvas.getContext('2d');
+
+let walls;
+function emptyWalls(){
+  const w = [];
+  for(let r=0;r<N;r++){ const row=[]; for(let c=0;c<N;c++){ row.push({N:true,E:true,S:true,W:true}); } w.push(row); }
+  return w;
+}
+function link(r,c,dir){
+  const dr={N:-1,S:1,E:0,W:0}[dir], dc={N:0,S:0,E:1,W:-1}[dir];
+  const nr=r+dr, nc=c+dc;
+  const opp={N:'S',S:'N',E:'W',W:'E'}[dir];
+  walls[r][c][dir]=false;
+  walls[nr][nc][opp]=false;
+}
+function inBounds(r,c){ return r>=0&&r<N&&c>=0&&c<N; }
+
+function generateMaze(){
+  walls = emptyWalls();
+  const visited = Array.from({length:N},()=>Array(N).fill(false));
+  const stack=[[N-1,0]];
+  visited[N-1][0]=true;
+  while(stack.length){
+    const [r,c]=stack[stack.length-1];
+    const dirs=['N','E','S','W'].sort(()=>Math.random()-0.5);
+    let moved=false;
+    for(const dir of dirs){
+      const dr={N:-1,S:1,E:0,W:0}[dir], dc={N:0,S:0,E:1,W:-1}[dir];
+      const nr=r+dr, nc=c+dc;
+      if(inBounds(nr,nc) && !visited[nr][nc]){
+        link(r,c,dir); visited[nr][nc]=true; stack.push([nr,nc]); moved=true; break;
+      }
+    }
+    if(!moved) stack.pop();
+  }
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    if(Math.random()<0.10){
+      const dirs=['N','E','S','W'];
+      const dir=dirs[Math.floor(Math.random()*4)];
+      const dr={N:-1,S:1,E:0,W:0}[dir], dc={N:0,S:0,E:1,W:-1}[dir];
+      const nr=r+dr, nc=c+dc;
+      if(inBounds(nr,nc) && walls[r][c][dir]) link(r,c,dir);
+    }
+  }
+}
+
+const goal = {r: Math.floor(N/2), c: Math.floor(N/2)};
+const start = {r:N-1,c:0};
+
+function manhattan(r,c,gr,gc){ return Math.abs(r-gr)+Math.abs(c-gc); }
+
+function astar(sr,sc,gr,gc){
+  const key=(r,c)=>r+','+c;
+  const open=[{r:sr,c:sc,g:0,f:manhattan(sr,sc,gr,gc),parent:null}];
+  const bestG={ [key(sr,sc)]:0 };
+  const closed=new Set();
+  while(open.length){
+    open.sort((a,b)=>a.f-b.f);
+    const cur=open.shift();
+    const ck=key(cur.r,cur.c);
+    if(cur.r===gr && cur.c===gc){
+      const path=[]; let n=cur;
+      while(n){ path.unshift({r:n.r,c:n.c}); n=n.parent; }
+      return path;
+    }
+    if(closed.has(ck)) continue;
+    closed.add(ck);
+    for(const dir of ['N','E','S','W']){
+      if(walls[cur.r][cur.c][dir]) continue;
+      const dr={N:-1,S:1,E:0,W:0}[dir], dc={N:0,S:0,E:1,W:-1}[dir];
+      const nr=cur.r+dr, nc=cur.c+dc;
+      if(!inBounds(nr,nc)) continue;
+      const k=key(nr,nc);
+      const g=cur.g+1;
+      if(bestG[k]===undefined || g<bestG[k]){
+        bestG[k]=g;
+        open.push({r:nr,c:nc,g,f:g+manhattan(nr,nc,gr,gc),parent:cur});
+      }
+    }
+  }
+  return null;
+}
+
+class PID{
+  constructor(kp,ki,kd){ this.kp=kp; this.ki=ki; this.kd=kd; this.integral=0; this.prev=0; }
+  update(error,dt){
+    this.integral += error*dt;
+    const deriv = (error-this.prev)/Math.max(dt,0.0001);
+    this.prev = error;
+    return this.kp*error + this.ki*this.integral + this.kd*deriv;
+  }
+  reset(){ this.integral=0; this.prev=0; }
+}
+function normAngle(a){ while(a>Math.PI) a-=2*Math.PI; while(a<-Math.PI) a+=2*Math.PI; return a; }
+
+let headingPID = new PID(5,0,0.4);
+let pos = {x: start.c*cell+cell/2, y: start.r*cell+cell/2};
+let heading = -Math.PI/2;
+let speed = 0;
+let path = [];
+let wpIndex = 1;
+let running = false;
+let arrived = false;
+let lastTime = null;
+let rafId = null;
+
+function currentCell(){ return {r: Math.floor(pos.y/cell), c: Math.floor(pos.x/cell)}; }
+
+function replan(){
+  const cc = currentCell();
+  const p = astar(cc.r, cc.c, goal.r, goal.c);
+  path = p || [];
+  wpIndex = 1;
+  headingPID.reset();
+  document.getElementById('tPath').textContent = path.length ? path.length : 'no path';
+}
+
+function waypoints(){ return path.map(p=>({x:p.c*cell+cell/2, y:p.r*cell+cell/2})); }
+
+function step(dt){
+  const wps = waypoints();
+  if(!wps.length || wpIndex>=wps.length){
+    speed = Math.max(0, speed - 400*dt);
+    document.getElementById('tStatus').textContent = arrived ? 'arrived' : 'no path';
+    return;
+  }
+  const advanceRadius = 14;
+  let target = wps[wpIndex];
+  let dx = target.x-pos.x, dy = target.y-pos.y;
+  let distToWp = Math.hypot(dx,dy);
+  while(distToWp < advanceRadius && wpIndex < wps.length-1){
+    wpIndex++;
+    target = wps[wpIndex];
+    dx = target.x-pos.x; dy = target.y-pos.y;
+    distToWp = Math.hypot(dx,dy);
+  }
+  if(wpIndex>=wps.length-1 && distToWp < advanceRadius){ arrived=true; }
+
+  const nextTarget = wps[wpIndex+1] || target;
+  const desiredHeading = Math.atan2(dy,dx);
+  const err = normAngle(desiredHeading - heading);
+
+  headingPID.kp = parseFloat(document.getElementById('kp').value)||0;
+  headingPID.ki = parseFloat(document.getElementById('ki').value)||0;
+  headingPID.kd = parseFloat(document.getElementById('kd').value)||0;
+  const pidOut = headingPID.update(err, dt);
+  const angularVel = Math.max(-9, Math.min(9, pidOut));
+  heading = normAngle(heading + angularVel*dt);
+
+  const maxSpeed = parseFloat(document.getElementById('maxSpeed').value);
+
+  let turnSharpness = 0;
+  if(nextTarget !== target){
+    const inLen = Math.hypot(dx,dy) || 1;
+    const vInX = dx/inLen, vInY = dy/inLen;
+    const outX = nextTarget.x-target.x, outY = nextTarget.y-target.y;
+    const outLen = Math.hypot(outX,outY) || 1;
+    const vOutX = outX/outLen, vOutY = outY/outLen;
+    const cosAngle = Math.max(-1, Math.min(1, vInX*vOutX + vInY*vOutY));
+    turnSharpness = (1-cosAngle)/2;
+  }
+  const cornerSpeedFactor = 1 - turnSharpness*0.85;
+  const proximity = Math.max(0, Math.min(1, distToWp/(cell*1.3)));
+  const speedLimit = maxSpeed * (cornerSpeedFactor + (1-cornerSpeedFactor)*proximity);
+
+  const align = Math.max(0, Math.cos(err));
+  let targetSpeed = speedLimit * Math.pow(align,2);
+  if(arrived) targetSpeed = 0;
+  const accel = 320;
+  if(speed < targetSpeed) speed = Math.min(targetSpeed, speed + accel*dt);
+  else speed = Math.max(targetSpeed, speed - accel*dt*1.6);
+
+  pos.x += speed*Math.cos(heading)*dt;
+  pos.y += speed*Math.sin(heading)*dt;
+
+  const cc = currentCell();
+  document.getElementById('tHeading').textContent = Math.round(heading*180/Math.PI) + ' deg';
+  document.getElementById('tSpeed').textContent = Math.round(speed) + ' px/s';
+  document.getElementById('tManhattan').textContent = manhattan(cc.r,cc.c,goal.r,goal.c) + ' cells';
+  document.getElementById('tPidOut').textContent = pidOut.toFixed(2);
+  document.getElementById('tStatus').textContent = arrived ? 'arrived' : 'driving';
+}
+
+function loop(t){
+  if(!running) return;
+  if(lastTime===null) lastTime=t;
+  const dt = Math.min((t-lastTime)/1000, 0.05);
+  lastTime = t;
+  step(dt);
+  draw();
+  rafId = requestAnimationFrame(loop);
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  const wps = waypoints();
+  if(wps.length>1){
+    ctx.strokeStyle = 'rgba(55,138,221,0.5)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(wps[0].x, wps[0].y);
+    for(let i=1;i<wps.length;i++) ctx.lineTo(wps[i].x, wps[i].y);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = 'rgba(99,153,34,0.5)';
+  ctx.fillRect(goal.c*cell, goal.r*cell, cell, cell);
+
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 2;
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    const x=c*cell, y=r*cell;
+    const w = walls[r][c];
+    ctx.beginPath();
+    if(w.N){ ctx.moveTo(x,y); ctx.lineTo(x+cell,y); }
+    if(w.S){ ctx.moveTo(x,y+cell); ctx.lineTo(x+cell,y+cell); }
+    if(w.W){ ctx.moveTo(x,y); ctx.lineTo(x,y+cell); }
+    if(w.E){ ctx.moveTo(x+cell,y); ctx.lineTo(x+cell,y+cell); }
+    ctx.stroke();
+  }
+
+  ctx.save();
+  ctx.translate(pos.x,pos.y);
+  ctx.rotate(heading);
+  ctx.fillStyle = '#D85A30';
+  ctx.beginPath();
+  ctx.moveTo(12,0);
+  ctx.lineTo(-8,8);
+  ctx.lineTo(-8,-8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+canvas.addEventListener('mousedown', e=>{
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX-rect.left, y = e.clientY-rect.top;
+  const c = Math.floor(x/cell), r = Math.floor(y/cell);
+  if(!inBounds(r,c)) return;
+  const fx = (x - c*cell)/cell, fy = (y - r*cell)/cell;
+  let dir;
+  if(fy < 0.3 && fy < fx && fy < 1-fx) dir='N';
+  else if(fy > 0.7 && (1-fy) < fx && (1-fy) < 1-fx) dir='S';
+  else if(fx < 0.5) dir='W';
+  else dir='E';
+  const dr={N:-1,S:1,E:0,W:0}[dir], dc={N:0,S:0,E:1,W:-1}[dir];
+  const nr=r+dr, nc=c+dc;
+  if(!inBounds(nr,nc)) return;
+  const opp={N:'S',S:'N',E:'W',W:'E'}[dir];
+  const newVal = !walls[r][c][dir];
+  walls[r][c][dir]=newVal;
+  walls[nr][nc][opp]=newVal;
+  replan();
+  draw();
+});
+
+document.getElementById('btnMaze').addEventListener('click', ()=>{
+  stopRun();
+  generateMaze();
+  resetMouse();
+});
+document.getElementById('btnClear').addEventListener('click', ()=>{
+  stopRun();
+  walls = emptyWalls();
+  for(let i=0;i<N;i++){
+    walls[0][i].N=true; walls[N-1][i].S=true;
+    walls[i][0].W=true; walls[i][N-1].E=true;
+  }
+  resetMouse();
+});
+document.getElementById('btnReset').addEventListener('click', ()=>{
+  stopRun();
+  resetMouse();
+});
+document.getElementById('btnRun').addEventListener('click', ()=>{
+  const btn = document.getElementById('btnRun');
+  if(running){ stopRun(); return; }
+  arrived = false;
+  running = true;
+  lastTime = null;
+  btn.textContent = 'Stop';
+  replan();
+  rafId = requestAnimationFrame(loop);
+});
+
+function stopRun(){
+  running = false;
+  if(rafId) cancelAnimationFrame(rafId);
+  document.getElementById('btnRun').textContent = 'Start autonomous run';
+}
+function resetMouse(){
+  pos = {x: start.c*cell+cell/2, y: start.r*cell+cell/2};
+  heading = -Math.PI/2;
+  speed = 0;
+  arrived = false;
+  headingPID.reset();
+  replan();
+  draw();
+}
+
+generateMaze();
+resetMouse();
+</script>
+</body>
+</html>
