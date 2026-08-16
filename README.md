@@ -15,7 +15,7 @@ A beginner's guide to building a Micromouse robot — covering batteries, motors
 
 | File | Description |
 |---|---|
-| `MicroMouse_Research_paper.pdf` | The full write-up (70 pages) — rules, history, hardware (motors, batteries, voltage regulators, motor drivers, encoders), PID control theory and tuning, sensors (IR, ToF, IMU), Flood Fill / A* / DFS algorithms, mechanical design, and PCB design. |
+| `MicroMouse_Research_paper.pdf` | The full write-up (80 pages) — rules, history, hardware (motors, batteries, voltage regulators, motor drivers, encoders), PID control theory and tuning, sensors (IR, ToF, IMU), Flood Fill / A* / DFS algorithms, mechanical design, and PCB design. |
 | `floodfill_simulation.html` | An interactive game where you drive a mouse through a maze yourself, then reveal how the Flood Fill algorithm would have solved it, with an efficiency score. |
 | `simulation_for_MicroMouse_map.html` | An autonomous A* + PID simulator — the mouse plans a path with A* and drives it with a tunable PID heading controller, replanning live if you draw new walls. |
 
@@ -34,6 +34,9 @@ A beginner's guide to building a Micromouse robot — covering batteries, motors
 - Mechanical design: chassis, wheels, center of gravity, caster vs. skid
 - PCB design workflow
 - Testing, calibration, and debugging
+---
+
+> The assembly and making Paper or pdf with we coming sooner. We are working on it.
 
 ---
 
@@ -43,5 +46,5 @@ MIT License
 
 ---
 
-#### *Masterpiece on Micromouse*
+#### *Part Of Masterpiece*
 #### Made by Raj Madheshiya, 2026
