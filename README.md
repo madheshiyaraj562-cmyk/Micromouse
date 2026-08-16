@@ -3,8 +3,8 @@ A beginner-friendly research project on building and understanding Micromouse ro
 
 ---
 
-<p align="center"> <a href="https://(https://madheshiyaraj562-cmyk.github.io/Micromouse/simulation_for_MicroMouse_map.html)/"> <strong>🌐 Visit MicroMouse Simulator </strong> </a> </p>
-<p align="center"> <a href="https://(https://madheshiyaraj562-cmyk.github.io/Micromouse/floodfill_simulation.html)/"> <strong>🌐 Visit Flood-Fill Simulator </strong> </a> </p>
+<p align="center"> <a href="https://madheshiyaraj562-cmyk.github.io/Micromouse/simulation_for_MicroMouse_map.html"> <strong>🌐 Visit MicroMouse Simulator </strong> </a> </p>
+<p align="center"> <a href="https://madheshiyaraj562-cmyk.github.io/Micromouse/floodfill_simulation.html"> <strong>🌐 Visit Flood-Fill Simulator </strong> </a> </p>
 
 ---
 
