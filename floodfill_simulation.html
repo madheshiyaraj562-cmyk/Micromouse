@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Flood Fill Game - Race the Algorithm</title>
+<style>
+  body { font-family: sans-serif; background: #1a1a1a; color: #eee; display: flex; flex-direction: column; align-items: center; padding: 24px; }
+  h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+  p.sub { color: #888; font-size: 13px; margin: 0 0 16px; max-width: 480px; text-align: center; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: center; margin-bottom: 16px; }
+  button { background: #2a2a2a; color: #eee; border: 1px solid #444; border-radius: 6px; padding: 8px 14px; cursor: pointer; font-size: 14px; }
+  button:hover { background: #3a3a3a; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  .layout { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+  canvas { border: 1px solid #444; border-radius: 6px; background: #111; }
+  .sidebar { min-width: 240px; font-size: 13px; color: #bbb; }
+  .sidebar h3 { color: #eee; font-size: 14px; font-weight: 500; margin: 16px 0 6px; }
+  .sidebar h3:first-child { margin-top: 0; }
+  .row { display: flex; justify-content: space-between; padding: 3px 0; }
+  .row span:last-child { color: #eee; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .msg { background: #222; border: 1px solid #444; border-radius: 6px; padding: 10px 12px; font-size: 13px; line-height: 1.5; color: #ddd; }
+  .legend { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #999; margin-top: 8px; }
+  .swatch { width: 12px; height: 12px; border-radius: 2px; }
+  label { font-size: 13px; color: #bbb; display: flex; align-items: center; gap: 6px; }
+</style>
+</head>
+<body>
+
+<h1>Flood fill game</h1>
+<p class="sub">Drive the mouse to the goal yourself using the arrow keys, then reveal how flood fill solves it — and see how close you got to the shortest path.</p>
+
+<div class="controls">
+  <button id="btnNew">New maze</button>
+  <button id="btnUndo">Undo move</button>
+  <button id="btnReveal">Reveal flood fill</button>
+  <button id="btnStep" disabled>Step</button>
+  <button id="btnPlay" disabled>Play animation</button>
+  <label>Speed <input type="range" id="speed" min="1" max="10" value="6" step="1"></label>
+</div>
+
+<div class="layout">
+  <canvas id="grid" width="432" height="432"></canvas>
+  <div class="sidebar">
+    <h3>Round</h3>
+    <div class="row"><span>Your moves</span><span id="tMoves">0</span></div>
+    <div class="row"><span>Optimal moves</span><span id="tOptimal">hidden</span></div>
+    <div class="row"><span>Efficiency</span><span id="tEff">-</span></div>
+    <div class="row"><span>Total score</span><span id="tScore">0</span></div>
+
+    <h3>What's happening</h3>
+    <div class="msg" id="msg">Use the arrow keys to move the orange mouse from the bottom-left corner to the green goal cell. Each move counts, even backtracks.</div>
+
+    <div class="legend"><div class="swatch" style="background:rgba(55,138,221,0.5)"></div> lower number = closer to goal</div>
+    <div class="legend"><div class="swatch" style="background:#D85A30"></div> your path taken</div>
+    <div class="legend"><div class="swatch" style="background:#63f07a"></div> optimal shortest path</div>
+  </div>
+</div>
+
+<script>
+const N = 12;
+const cell = 36;
+const canvas = document.getElementById('grid');
+const ctx = canvas.getContext('2d');
+
+let walls;
+function emptyWalls(){
+  const w = [];
+  for(let r=0;r<N;r++){ const row=[]; for(let c=0;c<N;c++){ row.push({N:true,E:true,S:true,W:true}); } w.push(row); }
+  return w;
+}
+function link(r,c,dir){
+  const dr={N:-1,S:1,E:0,W:0}[dir], dc={N:0,S:0,E:1,W:-1}[dir];
+  const nr=r+dr, nc=c+dc;
+  const opp={N:'S',S:'N',E:'W',W:'E'}[dir];
+  walls[r][c][dir]=false;
+  walls[nr][nc][opp]=false;
+}
+function inBounds(r,c){ return r>=0&&r<N&&c>=0&&c<N; }
+
+function generateMaze(){
+  walls = emptyWalls();
+  const visited = Array.from({length:N},()=>Array(N).fill(false));
+  const stack=[[N-1,0]];
+  visited[N-1][0]=true;
+  while(stack.length){
+    const [r,c]=stack[stack.length-1];
+    const dirs=['N','E','S','W'].sort(()=>Math.random()-0.5);
+    let moved=false;
+    for(const dir of dirs){
+      const dr={N:-1,S:1,E:0,W:0}[dir], dc={N:0,S:0,E:1,W:-1}[dir];
+      const nr=r+dr, nc=c+dc;
+      if(inBounds(nr,nc) && !visited[nr][nc]){
+        link(r,c,dir); visited[nr][nc]=true; stack.push([nr,nc]); moved=true; break;
+      }
+    }
+    if(!moved) stack.pop();
+  }
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    if(Math.random()<0.08){
+      const dirs=['N','E','S','W'];
+      const dir=dirs[Math.floor(Math.random()*4)];
+      const dr={N:-1,S:1,E:0,W:0}[dir], dc={N:0,S:0,E:1,W:-1}[dir];
+      const nr=r+dr, nc=c+dc;
+      if(inBounds(nr,nc) && walls[r][c][dir]) link(r,c,dir);
+    }
+  }
+}
+
+function computeFlood(){
+  const dist = Array.from({length:N},()=>Array(N).fill(Infinity));
+  dist[goal.r][goal.c]=0;
+  const q=[[goal.r,goal.c]];
+  let qi=0;
+  while(qi<q.length){
+    const [r,c]=q[qi++];
+    for(const dir of ['N','E','S','W']){
+      if(walls[r][c][dir]) continue;
+      const dr={N:-1,S:1,E:0,W:0}[dir], dc={N:0,S:0,E:1,W:-1}[dir];
+      const nr=r+dr, nc=c+dc;
+      if(inBounds(nr,nc) && dist[nr][nc]>dist[r][c]+1){
+        dist[nr][nc]=dist[r][c]+1;
+        q.push([nr,nc]);
+      }
+    }
+  }
+  return dist;
+}
+
+const start = {r:N-1,c:0};
+const goal = {r: Math.floor(N/2), c: Math.floor(N/2)};
+
+let player, path, moves, phase, dist, revealLayer, maxLayer, optimalPath, totalScore=0, playTimer=null;
+
+function newRound(){
+  generateMaze();
+  player = {r:start.r,c:start.c};
+  path = [{r:start.r,c:start.c}];
+  moves = 0;
+  phase = 'play';
+  dist = null;
+  revealLayer = 0;
+  maxLayer = 0;
+  optimalPath = null;
+  document.getElementById('tMoves').textContent = '0';
+  document.getElementById('tOptimal').textContent = 'hidden';
+  document.getElementById('tEff').textContent = '-';
+  document.getElementById('btnReveal').disabled = false;
+  document.getElementById('btnStep').disabled = true;
+  document.getElementById('btnPlay').disabled = true;
+  document.getElementById('btnPlay').textContent = 'Play animation';
+  document.getElementById('msg').textContent = "Use the arrow keys to move the orange mouse from the bottom-left corner to the green goal cell. Each move counts, even backtracks.";
+  if(playTimer){ clearInterval(playTimer); playTimer=null; }
+  draw();
+}
+
+function tryMove(dir){
+  if(phase!=='play') return;
+  if(walls[player.r][player.c][dir]) return;
+  const dr={N:-1,S:1,E:0,W:0}[dir], dc={N:0,S:0,E:1,W:-1}[dir];
+  const nr=player.r+dr, nc=player.c+dc;
+  if(!inBounds(nr,nc)) return;
+  player = {r:nr,c:nc};
+  path.push({r:nr,c:nc});
+  moves++;
+  document.getElementById('tMoves').textContent = moves;
+  if(player.r===goal.r && player.c===goal.c){
+    phase='reached';
+    document.getElementById('msg').textContent = `You reached the goal in ${moves} moves. Click "Reveal flood fill" to see how the algorithm would have solved it.`;
+  }
+  draw();
+}
+
+window.addEventListener('keydown', e=>{
+  const map = {ArrowUp:'N', ArrowDown:'S', ArrowLeft:'W', ArrowRight:'E'};
+  if(map[e.key]){ e.preventDefault(); tryMove(map[e.key]); }
+});
+
+document.getElementById('btnNew').addEventListener('click', newRound);
+document.getElementById('btnUndo').addEventListener('click', ()=>{
+  if(phase!=='play' || path.length<2) return;
+  path.pop();
+  player = path[path.length-1];
+  moves = Math.max(0, moves-1);
+  document.getElementById('tMoves').textContent = moves;
+  draw();
+});
+
+document.getElementById('btnReveal').addEventListener('click', ()=>{
+  dist = computeFlood();
+  maxLayer = 0;
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++) if(dist[r][c]<Infinity) maxLayer = Math.max(maxLayer, dist[r][c]);
+  revealLayer = 0;
+  phase = 'revealing';
+  document.getElementById('btnReveal').disabled = true;
+  document.getElementById('btnStep').disabled = false;
+  document.getElementById('btnPlay').disabled = false;
+  document.getElementById('tOptimal').textContent = dist[start.r][start.c];
+  document.getElementById('msg').textContent = "Flood fill starts at the goal (layer 0) and spreads outward one step at a time, like water flooding through the maze. Every cell it reaches gets labeled with its distance from the goal.";
+  draw();
+});
+
+document.getElementById('btnStep').addEventListener('click', revealStep);
+document.getElementById('btnPlay').addEventListener('click', ()=>{
+  const btn = document.getElementById('btnPlay');
+  if(playTimer){ clearInterval(playTimer); playTimer=null; btn.textContent='Play animation'; return; }
+  btn.textContent = 'Pause';
+  const speed = document.getElementById('speed').value;
+  playTimer = setInterval(()=>{
+    if(!revealStep()){ clearInterval(playTimer); playTimer=null; btn.textContent='Play animation'; }
+  }, 500 - speed*40);
+});
+
+function revealStep(){
+  if(revealLayer >= maxLayer){
+    finishReveal();
+    return false;
+  }
+  revealLayer++;
+  draw();
+  return true;
+}
+
+function finishReveal(){
+  phase = 'done';
+  document.getElementById('btnStep').disabled = true;
+  document.getElementById('btnPlay').disabled = true;
+  optimalPath = [];
+  let cur = {r:start.r,c:start.c};
+  optimalPath.push(cur);
+  while(!(cur.r===goal.r && cur.c===goal.c)){
+    let nextCell=null;
+    for(const dir of ['N','E','S','W']){
+      if(walls[cur.r][cur.c][dir]) continue;
+      const dr={N:-1,S:1,E:0,W:0}[dir], dc={N:0,S:0,E:1,W:-1}[dir];
+      const nr=cur.r+dr, nc=cur.c+dc;
+      if(inBounds(nr,nc) && dist[nr][nc]===dist[cur.r][cur.c]-1){ nextCell={r:nr,c:nc}; break; }
+    }
+    if(!nextCell) break;
+    cur = nextCell;
+    optimalPath.push(cur);
+  }
+  const optimalMoves = dist[start.r][start.c];
+  const eff = Math.max(0, Math.min(100, Math.round(100*optimalMoves/Math.max(moves,1))));
+  document.getElementById('tEff').textContent = eff + '%';
+  const roundScore = Math.round(eff);
+  totalScore += roundScore;
+  document.getElementById('tScore').textContent = totalScore;
+  document.getElementById('msg').textContent = `Flood fill found the shortest path in ${optimalMoves} moves. You took ${moves}. Efficiency ${eff}% — that's ${roundScore} points this round. Click "New maze" to play again.`;
+  draw();
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if(dist){
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+      if(dist[r][c]<=revealLayer && dist[r][c]<Infinity){
+        const t = Math.min(dist[r][c]/(N*1.2),1);
+        ctx.fillStyle = `rgba(55,138,221,${0.06+0.18*(1-t)})`;
+        ctx.fillRect(c*cell, r*cell, cell, cell);
+      }
+    }
+  }
+
+  ctx.fillStyle = 'rgba(99,153,34,0.55)';
+  ctx.fillRect(goal.c*cell, goal.r*cell, cell, cell);
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.strokeRect(start.c*cell+2, start.r*cell+2, cell-4, cell-4);
+
+  if(path.length>1){
+    ctx.strokeStyle = 'rgba(216,90,48,0.7)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(path[0].c*cell+cell/2, path[0].r*cell+cell/2);
+    for(let i=1;i<path.length;i++) ctx.lineTo(path[i].c*cell+cell/2, path[i].r*cell+cell/2);
+    ctx.stroke();
+  }
+
+  if(optimalPath){
+    ctx.strokeStyle = '#63f07a';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(optimalPath[0].c*cell+cell/2, optimalPath[0].r*cell+cell/2);
+    for(let i=1;i<optimalPath.length;i++) ctx.lineTo(optimalPath[i].c*cell+cell/2, optimalPath[i].r*cell+cell/2);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 2;
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    const x=c*cell, y=r*cell;
+    const w = walls[r][c];
+    ctx.beginPath();
+    if(w.N){ ctx.moveTo(x,y); ctx.lineTo(x+cell,y); }
+    if(w.S){ ctx.moveTo(x,y+cell); ctx.lineTo(x+cell,y+cell); }
+    if(w.W){ ctx.moveTo(x,y); ctx.lineTo(x,y+cell); }
+    if(w.E){ ctx.moveTo(x+cell,y); ctx.lineTo(x+cell,y+cell); }
+    ctx.stroke();
+  }
+
+  if(dist){
+    ctx.fillStyle = '#aaa';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign='center';
+    for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+      if(dist[r][c]<=revealLayer && dist[r][c]<Infinity) ctx.fillText(dist[r][c], c*cell+cell/2, r*cell+cell/2+3);
+    }
+  }
+
+  const px = player.c*cell+cell/2, py = player.r*cell+cell/2;
+  ctx.fillStyle = '#D85A30';
+  ctx.beginPath();
+  ctx.arc(px,py,cell*0.24,0,Math.PI*2);
+  ctx.fill();
+}
+
+newRound();
+</script>
+</body>
+</html>
