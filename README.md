@@ -2,10 +2,8 @@
 A beginner-friendly research project on building and understanding Micromouse robots.
 
 ---
-
-<p align="left"> <a href="https://madheshiyaraj562-cmyk.github.io/Micromouse/simulation_for_MicroMouse_map.html"> <strong>🌐 Visit MicroMouse Simulator </strong> </a> </p>
-<p align="right"> <a href="https://madheshiyaraj562-cmyk.github.io/Micromouse/floodfill_simulation.html"> <strong>🌐 Visit Flood-Fill Simulator </strong> </a> </p>
-
+<p align="top left"> <a href="https://madheshiyaraj562-cmyk.github.io/Micromouse/simulation_for_MicroMouse_map.html"> <strong>🌐 Visit MicroMouse Simulator </strong> </a> </p>
+<p align="top right"> <a href="https://madheshiyaraj562-cmyk.github.io/Micromouse/floodfill_simulation.html"> <strong>🌐 Visit Flood-Fill Simulator </strong> </a> </p>
 ---
 
 A beginner's guide to building a Micromouse robot — covering batteries, motors, motor drivers, encoders, PID control, sensors, algorithms (Flood Fill, A*, DFS/BFS), mechanical design, PCB design, and testing/calibration.
