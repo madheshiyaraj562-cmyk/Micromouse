@@ -1,41 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Masterpiece on Micromouse</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Masterpiece on Micromouse</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #1a1a1a;
+    color: #eee;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 48px 24px;
+    line-height: 1.6;
+  }
+  h1 { font-size: 26px; margin-bottom: 4px; }
+  p.sub { color: #999; margin-top: 0; }
+  h2 { font-size: 16px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 36px; margin-bottom: 12px; }
+  a.card {
+    display: block;
+    background: #242424;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    padding: 14px 16px;
+    color: #eee;
+    text-decoration: none;
+    margin-bottom: 10px;
+  }
+  a.card:hover { background: #2c2c2c; border-color: #555; }
+  footer { margin-top: 48px; color: #666; font-size: 13px; }
+</style>
 </head>
-
 <body>
 
-    <h1>🐭 Masterpiece on Micromouse</h1>
+<h1>🐭 Masterpiece on Micromouse</h1>
+<p class="sub">A beginner-friendly research project on building and understanding Micromouse robots.</p>
 
-    <p>
-        A beginner-friendly research project on building
-        and understanding Micromouse robots.
-    </p>
+<h2>Research Paper</h2>
+<a class="card" href="MicroMouse_Research_paper.pdf">📄 Read the Research Paper</a>
 
-    <h2>📚 Research Paper</h2>
+<h2>Simulations</h2>
+<a class="card" href="floodfill_simulation.html">🟦 Flood Fill Simulation</a>
+<a class="card" href="simulation_for_MicroMouse_map.html">🟧 A* + PID Simulation</a>
 
-    <p>
-        <a href="MicroMouse_Research_paper.pdf">
-            📄 Read the Research Paper
-        </a>
-    </p>
-
-    <h2>🧠 Simulations</h2>
-
-    <p>
-        <a href="floodfill_simulation.html">
-            🟦 Flood Fill Simulation
-        </a>
-    </p>
-
-    <p>
-        <a href="simulation_for_MicroMouse_map.html">
-            🟧 A* + PID Simulation
-        </a>
-    </p>
+<footer>Made by Raj Madheshiya, 2026 &middot; MIT License</footer>
 
 </body>
 </html>
