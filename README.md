@@ -49,5 +49,5 @@ MIT License
 
 ---
 
-#### *Part Of Masterpiece*
+#### *Part Of Project Masterpiece*
 #### Made by Raj Madheshiya, 2026
